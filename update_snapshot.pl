@@ -3,8 +3,8 @@
 use strict;
 $ENV{PATH}='';
 $ENV{http_proxy}='';
-#my $DEBUG=0;
-my $DEBUG=1;
+my $DEBUG=0;
+#my $DEBUG=1;
 
 
 
@@ -19,13 +19,10 @@ use POSIX qw(strftime mktime);
 ############################################################
 # Variables 
 ############################################################
-#my $ZFS = "/usr/sbin/zfs";
-my $ZFS = "/bin/echo";
-#my $RM = "/usr/gnu/bin/rm";
-my $RM = "/bin/rm";
+my $ZFS = "/usr/sbin/zfs";
+my $RM = "/usr/gnu/bin/rm";
 my $tag = "GMT-" . (strftime "%Y.%m.%d-%H.%M.%S", localtime);
-#my $lockfile = "/root/.update_snapshot/update_snapshot.lock";
-my $lockfile = "/home/frny/Workspace/zfs/update_snapshot.lock";
+my $lockfile = "/root/.update_snapshot/update_snapshot.lock";
 my $snapshotlist = '';
 my $fullshotlist = '';
 my $pid = $$;
@@ -338,9 +335,7 @@ sub init_fullshotlist {
 
     my $cmd = "$ZFS list -t snapshot -r $options{'opt_fs'}";
     &debug($cmd);
-    #FREDRIK: Use textfile during profiling
-    #open (CMD, "$cmd |") || &abort(qq|Cannot run command "$cmd": $!|);
-    open (CMD, "zfs_list_snapshot_recursive.txt") || &abort(qq|Cannot run command "$cmd": $!|);
+    open (CMD, "$cmd |") || &abort(qq|Cannot run command "$cmd": $!|);
     while (my $thisrow = <CMD>) {
         next unless ($thisrow =~ /^\s*($this_filesystem.*\@GMT-.*?)\s+/ );
         my $snapname = $1;
@@ -367,9 +362,7 @@ sub verify_fs {
     my $cmd = "$ZFS list -t filesystem $this_fs";
     &debug($cmd);
 
-    #FREDRIK: Use textfile during profiling
-    #open (CMD, "$cmd |") || &abort(qq|Cannot run command "$cmd": $!|);
-    open (CMD, "zfs_list_target_fs.txt") || &abort(qq|Cannot run command "$cmd": $!|);
+    open (CMD, "$cmd |") || &abort(qq|Cannot run command "$cmd": $!|);
 
     my $found = '';
     while (my $thisrow = <CMD>) {
@@ -391,9 +384,7 @@ sub get_recursive {
 
     &debug("Recursive search for $this_fs.");
 
-    #FREDRIK: Use text file during profiling
-    #open (CMD, "$cmd |") || &abort(qq|Cannot run command "$cmd": $!|);
-    open (CMD, "zfs_list_filsystem_recursive.txt") || &abort(qq|Cannot run command "$cmd": $!|);
+    open (CMD, "$cmd |") || &abort(qq|Cannot run command "$cmd": $!|);
 
     while (my $thisrow = <CMD>) {
         next unless ( $thisrow =~ /^\s*(${this_fs}.*?)\s+/ );
