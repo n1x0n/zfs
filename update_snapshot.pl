@@ -3,7 +3,8 @@
 use strict;
 $ENV{PATH}='';
 $ENV{http_proxy}='';
-my $DEBUG=0;
+#my $DEBUG=0;
+my $DEBUG=1;
 
 
 
@@ -18,9 +19,13 @@ use POSIX qw(strftime mktime);
 ############################################################
 # Variables 
 ############################################################
-my $ZFS = "/usr/sbin/zfs";
+#my $ZFS = "/usr/sbin/zfs";
+my $ZFS = "/bin/echo";
+#my $RM = "/usr/gnu/bin/rm";
+my $RM = "/bin/rm";
 my $tag = "GMT-" . (strftime "%Y.%m.%d-%H.%M.%S", localtime);
-my $lockfile = "/root/.update_snapshot/update_snapshot.lock";
+#my $lockfile = "/root/.update_snapshot/update_snapshot.lock";
+my $lockfile = "/home/frny/Workspace/zfs/update_snapshot.lock";
 my $snapshotlist = '';
 my $fullshotlist = '';
 my $pid = $$;
@@ -172,7 +177,7 @@ sub get_lock {
 sub drop_lock {
 	&debug("Dropping lock.");
 	&debug(qq|Removing lockfile "$lockfile".|);
-	system(qq|/usr/gnu/bin/rm -f "$lockfile"|);
+	system(qq|$RM -f "$lockfile"|);
 }
 
 
@@ -185,7 +190,6 @@ sub new_snapshot {
     $recursive = "-r" if $options{'opt_recursive'};
     unless ( ($minutes - 1) % $options{'opt_interval'} ) {
         my $cmd = "$ZFS snapshot $recursive $this_filesystem\@$tag"; 
-        #my $cmd = "$ZFS snapshot $this_filesystem\@$tag"; 
         open (CMD, "$cmd |") || &abort(qq|Cannot run command "$cmd": $!|);
         while (<CMD>) {
             &debug($_);
@@ -315,9 +319,10 @@ sub init_snapshotlist {
     my %thislist;
     my $this_filesystem = shift;
 
-    foreach my $thisrow (sort keys %{$fullshotlist}) {
-        next unless ($thisrow =~ /^($this_filesystem\@GMT-.*?)$/ );
-        $thislist{$1} = 1;
+    my @snaplist = @{$fullshotlist->{$this_filesystem}};
+
+    foreach my $thisrow (@snaplist) {
+        $thislist{$thisrow} = 1;
     }
     close CMD;
     $snapshotlist = \%thislist;
@@ -333,14 +338,22 @@ sub init_fullshotlist {
 
     my $cmd = "$ZFS list -t snapshot -r $options{'opt_fs'}";
     &debug($cmd);
-    open (CMD, "$cmd |") || &abort(qq|Cannot run command "$cmd": $!|);
+    #FREDRIK: Use textfile during profiling
+    #open (CMD, "$cmd |") || &abort(qq|Cannot run command "$cmd": $!|);
+    open (CMD, "zfs_list_snapshot_recursive.txt") || &abort(qq|Cannot run command "$cmd": $!|);
     while (my $thisrow = <CMD>) {
         next unless ($thisrow =~ /^\s*($this_filesystem.*\@GMT-.*?)\s+/ );
-        $thislist{$1} = 1;
+        my $snapname = $1;
+        my $fsname = (split /\@/, $snapname)[0];
+        if ( $thislist{$fsname} ) {
+            push @{$thislist{$fsname}}, $snapname;
+        } else {
+            my @dummy = ($snapname);
+            $thislist{$fsname} = \@dummy
+        }
     }
     close CMD;
     $fullshotlist = \%thislist;
-    &debug("Found " . (scalar keys %thislist) . " snapshots for FULL.");
 }
 
 
@@ -354,7 +367,9 @@ sub verify_fs {
     my $cmd = "$ZFS list -t filesystem $this_fs";
     &debug($cmd);
 
-    open (CMD, "$cmd |") || &abort(qq|Cannot run command "$cmd": $!|);
+    #FREDRIK: Use textfile during profiling
+    #open (CMD, "$cmd |") || &abort(qq|Cannot run command "$cmd": $!|);
+    open (CMD, "zfs_list_target_fs.txt") || &abort(qq|Cannot run command "$cmd": $!|);
 
     my $found = '';
     while (my $thisrow = <CMD>) {
@@ -376,7 +391,9 @@ sub get_recursive {
 
     &debug("Recursive search for $this_fs.");
 
-    open (CMD, "$cmd |") || &abort(qq|Cannot run command "$cmd": $!|);
+    #FREDRIK: Use text file during profiling
+    #open (CMD, "$cmd |") || &abort(qq|Cannot run command "$cmd": $!|);
+    open (CMD, "zfs_list_filsystem_recursive.txt") || &abort(qq|Cannot run command "$cmd": $!|);
 
     while (my $thisrow = <CMD>) {
         next unless ( $thisrow =~ /^\s*(${this_fs}.*?)\s+/ );
