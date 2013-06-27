@@ -18,3 +18,6 @@ The defaults are:
 - Yearly snapshots, kept forever. 
 
 The script has been profiled and tuned to be able to manage thousands of snapshots.
+
+Here is how I run it in crontab:
+    * * * * * /root/zfs/update_snapshot.pl --filesystem tank/zones --weekly 5 --monthly 12 --yearly -1 --recursive
