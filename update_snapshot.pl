@@ -12,6 +12,7 @@ my $DEBUG=0;
 # Modules
 ############################################################
 use POSIX qw(strftime mktime);
+use Time::HiRes qw(gettimeofday tv_interval);
 
 
 
@@ -23,6 +24,7 @@ my $ZFS = "/usr/sbin/zfs";
 my $RM = "/usr/gnu/bin/rm";
 my $tag = "GMT-" . (strftime "%Y.%m.%d-%H.%M.%S", localtime);
 my $lockfile = "/root/.update_snapshot/update_snapshot.lock";
+my $statsdir = "/root/.update_snapshot";
 my $snapshotlist = '';
 my $fullshotlist = '';
 my $pid = $$;
@@ -60,12 +62,22 @@ if ( &take_action ) {
 }
 
 # Take snapshots
+my $starttime = [gettimeofday];
 &get_recursive if ( $options{'opt_recursive'} ); 
 &new_snapshot($options{'opt_fs'});
 foreach my $this_filesystem ( @filesystemlist ) {
 	$snapshotlist = '';
 	&cleanup_snapshots($this_filesystem);
 }
+my $elapsed = tv_interval ($starttime);
+debug("The whole process took $elapsed");
+
+    my $timefile = $options{'opt_fs'};
+    $timefile =~ s/\//####/g;
+    $timefile = $statsdir . "/" . $timefile . ".time";
+    open ( STATS, ">$timefile" ) || &abort(qq|Cannot write to timefile "$timefile": $!|);
+    print STATS "$elapsed\n";
+    close STATS;
 
 # Drop lock
 &drop_lock;
@@ -335,9 +347,11 @@ sub init_fullshotlist {
 
     my $cmd = "$ZFS list -t snapshot -r $options{'opt_fs'}";
     &debug($cmd);
+    my $counter = 0;
     open (CMD, "$cmd |") || &abort(qq|Cannot run command "$cmd": $!|);
     while (my $thisrow = <CMD>) {
         next unless ($thisrow =~ /^\s*($this_filesystem.*\@GMT-.*?)\s+/ );
+        $counter += 1;
         my $snapname = $1;
         my $fsname = (split /\@/, $snapname)[0];
         if ( $thislist{$fsname} ) {
@@ -348,6 +362,12 @@ sub init_fullshotlist {
         }
     }
     close CMD;
+    my $statsfile = $options{'opt_fs'};
+    $statsfile =~ s/\//####/g;
+    $statsfile = $statsdir . "/" . $statsfile . ".stats";
+    open ( STATS, ">$statsfile" ) || &abort(qq|Cannot write to statsfile "$statsfile": $!|);
+    print STATS "$counter\n";
+    close STATS;
     $fullshotlist = \%thislist;
 }
 
@@ -380,7 +400,7 @@ sub verify_fs {
 
 sub get_recursive {
     my $this_fs = $filesystemlist[0];
-    my $cmd = "$ZFS list -t filesystem -r $this_fs";
+    my $cmd = "$ZFS list -r $this_fs";
 
     &debug("Recursive search for $this_fs.");
 
