@@ -29,6 +29,8 @@ my $snapshotlist = '';
 my $fullshotlist = '';
 my $pid = $$;
 my @filesystemlist;
+my $carbon_server = "graphite.int.valteo.net";
+my $carbon_port = "2003";
 
 
 
@@ -72,12 +74,22 @@ foreach my $this_filesystem ( @filesystemlist ) {
 my $elapsed = tv_interval ($starttime);
 debug("The whole process took $elapsed");
 
-    my $timefile = $options{'opt_fs'};
-    $timefile =~ s/\//####/g;
-    $timefile = $statsdir . "/" . $timefile . ".time";
-    open ( STATS, ">$timefile" ) || &abort(qq|Cannot write to timefile "$timefile": $!|);
-    print STATS "$elapsed\n";
-    close STATS;
+# Report for munin
+my $timefile = $options{'opt_fs'};
+$timefile =~ s/\//####/g;
+$timefile = $statsdir . "/" . $timefile . ".time";
+open ( STATS, ">$timefile" ) || &abort(qq|Cannot write to timefile "$timefile": $!|);
+print STATS "$elapsed\n";
+close STATS;
+
+# Report to graphite
+my $name = $options{'opt_fs'};
+$name =~ s/\//./g;
+my $timestamp = $starttime->[0];
+open ( NC, qq(| /usr/bin/nc $carbon_server $carbon_port) ) || &abort(qq|Cannot run "/usr/bin/nc": $!|);
+print NC "VALTEO.chunk.zfs.snapshot.${name}.elapsed $elapsed $timestamp\n";
+close NC;
+
 
 # Drop lock
 &drop_lock;
@@ -368,6 +380,12 @@ sub init_fullshotlist {
     open ( STATS, ">$statsfile" ) || &abort(qq|Cannot write to statsfile "$statsfile": $!|);
     print STATS "$counter\n";
     close STATS;
+    my $name = $options{'opt_fs'};
+    $name =~ s/\//./g;
+    my $timestamp = $starttime->[0];
+    open ( NC, qq(| /usr/bin/nc $carbon_server $carbon_port) ) || &abort(qq|Cannot run "/usr/bin/nc": $!|);
+    print NC "VALTEO.chunk.zfs.snapshot.${name}.snapshots $counter $timestamp\n";
+    close NC;
     $fullshotlist = \%thislist;
 }
 
